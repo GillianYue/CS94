@@ -1,0 +1,1791 @@
+#line 1 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+#line 6 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+#pragma warning(disable:4008)
+#line 7 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+#line 1 "/Engine/Public/Platform.ush"
+#line 9 "/Engine/Public/Platform.ush"
+#line 1 "FP16Math.ush"
+#line 10 "/Engine/Public/Platform.ush"
+#line 43 "/Engine/Public/Platform.ush"
+#line 1 "ShaderVersion.ush"
+#line 44 "/Engine/Public/Platform.ush"
+#line 595 "/Engine/Public/Platform.ush"
+float min3( float a, float b, float c )
+{
+	return min( a, min( b, c ) );
+}
+
+float max3( float a, float b, float c )
+{
+	return max( a, max( b, c ) );
+}
+
+float2 min3( float2 a, float2 b, float2 c )
+{
+	return float2(
+		min3( a.x, b.x, c.x ),
+		min3( a.y, b.y, c.y )
+	);
+}
+
+float2 max3( float2 a, float2 b, float2 c )
+{
+	return float2(
+		max3( a.x, b.x, c.x ),
+		max3( a.y, b.y, c.y )
+	);
+}
+
+float3 max3( float3 a, float3 b, float3 c )
+{
+	return float3(
+		max3( a.x, b.x, c.x ),
+		max3( a.y, b.y, c.y ),
+		max3( a.z, b.z, c.z )
+	);
+}
+
+float3 min3( float3 a, float3 b, float3 c )
+{
+	return float3(
+		min3( a.x, b.x, c.x ),
+		min3( a.y, b.y, c.y ),
+		min3( a.z, b.z, c.z )
+	);
+}
+
+float4 min3( float4 a, float4 b, float4 c )
+{
+	return float4(
+		min3( a.x, b.x, c.x ),
+		min3( a.y, b.y, c.y ),
+		min3( a.z, b.z, c.z ),
+		min3( a.w, b.w, c.w )
+	);
+}
+
+float4 max3( float4 a, float4 b, float4 c )
+{
+	return float4(
+		max3( a.x, b.x, c.x ),
+		max3( a.y, b.y, c.y ),
+		max3( a.z, b.z, c.z ),
+		max3( a.w, b.w, c.w )
+	);
+}
+
+
+
+
+float UnpackByte0(uint v) { return float(v & 0xff); }
+float UnpackByte1(uint v) { return float((v >> 8) & 0xff); }
+float UnpackByte2(uint v) { return float((v >> 16) & 0xff); }
+float UnpackByte3(uint v) { return float(v >> 24); }
+#line 8 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+
+
+
+
+
+
+	const static float PI = 3.1415926535897932f;
+
+	const static float TWO_PI = 3.1415926535897932f*2.0f;
+#line 18 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+#line 1 "/Engine/Private/Definitions.usf"
+#line 19 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+
+
+float4 ModuloPrecise(float4 x, float4 y){ return x - y * trunc(x/y); }
+float3 ModuloPrecise(float3 x, float3 y){ return x - y * trunc(x/y); }
+float2 ModuloPrecise(float2 x, float2 y){ return x - y * trunc(x/y);}
+float ModuloPrecise(float x, float y){ return x - y * trunc(x/y); }
+int ModuloPrecise(int x, int y){ return x - y * (x/y); }
+int Modulo(int x, int y){ return x - y * (x/y); }
+
+
+
+float4 Reciprocal(float4 x){ return 1.0f/x;}
+float3 Reciprocal(float3 x){ return 1.0f/x; }
+float2 Reciprocal(float2 x){ return 1.0f/x;}
+float Reciprocal(float x){ return 1.0f/x; }
+
+
+
+bool NiagaraAll(bool b) { return b; }
+bool NiagaraAny(bool b) { return b; }
+
+
+
+
+
+
+
+
+
+bool NiagaraAll(bool2 b) { return b.x && b.y; }
+bool NiagaraAll(bool3 b) { return b.x && b.y && b.z; }
+bool NiagaraAll(bool4 b) { return b.x && b.y && b.z && b.w; }
+bool NiagaraAny(bool2 b) { return b.x || b.y; }
+bool NiagaraAny(bool3 b) { return b.x || b.y || b.z; }
+bool NiagaraAny(bool4 b) { return b.x || b.y || b.z || b.w; }
+#line 193 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+float4 rand4(int Seed1, int Seed2, int Seed3, int Seed4)
+{
+	int4 v = int4(Seed4, Seed1, Seed2, Seed3) * 1664525 + 1013904223;
+
+	v.x += v.y*v.w;
+	v.y += v.z*v.x;
+	v.z += v.x*v.y;
+	v.w += v.y*v.z;
+	v.x += v.y*v.w;
+	v.y += v.z*v.x;
+	v.z += v.x*v.y;
+	v.w += v.y*v.z;
+
+
+
+
+
+
+	return float4((v >> 8) & 0x00ffffff) / 16777216.0;
+
+}
+
+
+
+
+
+
+
+float3 rand3(int Seed1, int Seed2, int Seed3, int Seed4)
+{
+	int3 v = int3(Seed1, Seed2, Seed4 | (Seed3 << 16)) * 1664525 + 1013904223;
+
+	v.x += v.y*v.z;
+	v.y += v.z*v.x;
+	v.z += v.x*v.y;
+	v.x += v.y*v.z;
+	v.y += v.z*v.x;
+	v.z += v.x*v.y;
+
+	return float3((v >> 8) & 0x00ffffff) / 16777216.0;
+}
+
+
+static int RandomCounterDeterministic = 0;
+
+
+float rand(float x, int Seed1, int Seed2, int Seed3)
+{
+	RandomCounterDeterministic += 1;
+	return rand3(Seed1, Seed2, Seed3, RandomCounterDeterministic).x * x;
+}
+
+
+float2 rand(float2 x, int Seed1, int Seed2, int Seed3)
+{
+	RandomCounterDeterministic += 1;
+	return rand3(Seed1, Seed2, Seed3, RandomCounterDeterministic).xy * x;
+}
+
+
+float3 rand(float3 x, int Seed1, int Seed2, int Seed3)
+{
+	RandomCounterDeterministic += 1;
+	return rand3(Seed1, Seed2, Seed3, RandomCounterDeterministic).xyz * x;
+}
+
+
+float4 rand(float4 x, int Seed1, int Seed2, int Seed3)
+{
+	RandomCounterDeterministic += 1;
+	return rand4(Seed1, Seed2, Seed3, RandomCounterDeterministic).xyzw * x;
+}
+
+
+int rand(int x, int Seed1, int Seed2, int Seed3)
+{
+
+
+	RandomCounterDeterministic += 1;
+	return int(rand3(Seed1, Seed2, Seed3, RandomCounterDeterministic).x * (x+1));
+}
+#line 323 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+	float rand(float x);
+
+	float2 rand(float2 x)
+	{
+		return float2(rand(x.x), rand(x.y));
+	}
+
+	float3 rand(float3 x)
+	{
+		return float3(rand(x.x), rand(x.y), rand(x.z));
+	}
+
+	float4 rand(float4 x)
+	{
+		return float4(rand(x.x), rand(x.y), rand(x.z), rand(x.w));
+	}
+
+	int rand(int x);
+
+
+
+float rand_float(float x)
+{
+	return rand(x.x);
+}
+
+float2 rand_float(float2 x)
+{
+	return float2(rand_float(x.x), rand_float(x.y));
+}
+
+float3 rand_float(float3 x)
+{
+	return float3(rand_float(x.x), rand_float(x.y), rand_float(x.z));
+}
+
+float4 rand_float(float4 x)
+{
+	return float4(rand_float(x.x), rand_float(x.y), rand_float(x.z), rand_float(x.w));
+}
+
+int rand_int(int x)
+{
+
+
+
+	return rand_float(x.x);
+}
+
+
+float rand_float(float x, int Seed1, int Seed2, int Seed3)
+{
+	return rand(x.x, Seed1, Seed2, Seed3);
+}
+
+float2 rand_float(float2 x, int Seed1, int Seed2, int Seed3)
+{
+	return rand(x, Seed1, Seed2, Seed3);
+}
+
+float3 rand_float(float3 x, int Seed1, int Seed2, int Seed3)
+{
+	return rand(x, Seed1, Seed2, Seed3);
+}
+
+float4 rand_float(float4 x, int Seed1, int Seed2, int Seed3)
+{
+	return rand(x, Seed1, Seed2, Seed3);
+}
+
+int rand_int(int x, int Seed1, int Seed2, int Seed3)
+{
+
+
+	return rand(x.x-1, Seed1, Seed2, Seed3);
+}
+#line 405 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+	float noise(float x);
+	float noise(float2 x);
+	float noise(float3 x);
+
+
+
+	float4 Modulo(float4 x, float4 y);
+	float3 Modulo(float3 x, float3 y);
+	float2 Modulo(float2 x, float2 y);
+	float Modulo(float x, float y);
+
+
+	int ExecIndex();
+
+
+
+	int AcquireIndex(int DataSetID, bool DoAcquire);
+
+	void AcquireID(int DataSetID, out int IDIndex, out int IDAcquireTag);
+	void UpdateID(int DataSetID, int IDIndex, int InstanceIndex);
+
+	float InputDataFloat(int DataSetIndex, int RegisterIdx);
+	int InputDataInt(int DataSetIndex, int RegisterIdx);
+	bool InputDataBool(int DataSetIndex, int RegisterIdx);
+
+	float InputDataNoadvanceFloat(int DataSetIndex, int RegisterIdx);
+	int InputDataNoadvanceInt(int DataSetIndex, int RegisterIdx);
+	bool InputDataNoadvanceBool(int DataSetIndex, int RegisterIdx);
+
+	void OutputDataFloat(int DataSetIndex, int RegisterIndex, int InstanceIndex, float Value);
+	void OutputDataInt(int DataSetIndex, int RegisterIndex, int InstanceIndex, int Value);
+	void OutputDataBool(int DataSetIndex, int RegisterIndex, int InstanceIndex, bool Value);
+#line 683 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+	int OutputIndex(const int DataSetID, const bool bStageKillsParticles, const bool bIsValid)
+	{
+#line 698 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+			return AcquireIndex(DataSetID, bIsValid);
+	}
+#line 702 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+#line 1 "/Engine/Generated/NiagaraEmitterInstance.ush"
+
+
+
+
+struct NiagaraSpawnInfo
+{
+	int Count;
+	float InterpStartDt;
+	float IntervalDt;
+	int SpawnGroup;
+};
+
+struct NiagaraID
+{
+	int Index;
+	int AcquireTag;
+};
+
+cbuffer FNiagaraGlobalParameters
+{
+	float Engine_DeltaTime;
+	float Engine_InverseDeltaTime;
+	float Engine_Time;
+	float Engine_RealTime;
+}
+
+cbuffer FNiagaraSystemParameters
+{
+}
+
+cbuffer FNiagaraOwnerParameters
+{
+}
+
+cbuffer FNiagaraEmitterParameters
+{
+}
+
+cbuffer FNiagaraExternalParameters
+{
+	float Constants_INTEGER_02_SparksOutAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd_SphereRadius;
+	float Constants_INTEGER_01_SparksInAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd_SphereRadius;
+	int Emitter_RandomSeed;
+}
+
+struct FParamMap0_VectorFromFloat
+{
+	float Value;
+};
+
+struct FParamMap0_VectorFromCurve001
+{
+	float CurveIndex;
+};
+
+struct FParamMap0_VectorFromCurve
+{
+	float CurveIndex;
+};
+
+struct FParamMap0_Vector2DFromFloat001
+{
+	float Value;
+};
+
+struct FParamMap0_Vector2DFromFloat
+{
+	float Value;
+};
+
+struct FParamMap0_User
+{
+	float4 color01;
+	float4 color02;
+	float ImpactDelay;
+};
+
+struct FParamMap0_UniformRangedVector2D
+{
+	bool FixedRandomSeed;
+	float2 Maximum;
+	float2 Minimum;
+	bool OverrideRandomness;
+	bool OverrideSeed;
+	int RandomnessMode;
+	int RandomSeed;
+};
+
+struct FParamMap0_UniformRangedLinearColor
+{
+	bool FixedRandomSeed;
+	float4 Maximum;
+	float4 Minimum;
+	bool OverrideRandomness;
+	bool OverrideSeed;
+	int RandomnessMode;
+	int RandomSeed;
+};
+
+struct FParamMap0_UniformRangedInt
+{
+	bool FixedRandomSeed;
+	int Maximum;
+	int Minimum;
+	bool OverrideRandomness;
+	bool OverrideSeed;
+	int RandomnessMode;
+	int RandomSeed;
+};
+
+struct FParamMap0_UniformRangedFloat001
+{
+	bool FixedRandomSeed;
+	float Maximum;
+	float Minimum;
+	bool OverrideRandomness;
+	bool OverrideSeed;
+	int RandomnessMode;
+	int RandomSeed;
+};
+
+struct FParamMap0_UniformRangedFloat
+{
+	bool FixedRandomSeed;
+	float Maximum;
+	float Minimum;
+	bool OverrideRandomness;
+	bool OverrideSeed;
+	int RandomnessMode;
+	int RandomSeed;
+};
+
+struct FParamMap0_Transient
+{
+	float3 MeshScaleFactor;
+	float4 ParticleColorScaleFactor;
+	float PhysicsDeltaTime;
+	float PhysicsDrag;
+	float3 PhysicsForce;
+	float PhysicsRotationalDrag;
+	float3 PhysicsRotationalForce;
+	int ScalabilityEmitterExecutionState;
+	float ScalabilityEmitterSpawnCountScale;
+	bool SpawningbCanEverSpawn;
+	float2 SpriteSizeScaleFactor;
+};
+
+struct FParamMap0_TransformPosition
+{
+	bool ApplyScale;
+	int DestinationSpace;
+	float3 Position;
+	int SourceSpace;
+};
+
+struct FParamMap0_System
+{
+	float Age;
+	bool bCompleteOnInactive;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+};
+
+struct FParamMap0_SphereLocation
+{
+	int CoordinateSpace;
+	bool FixedRandomSeed;
+	bool HemisphereX;
+	bool HemisphereY;
+	bool HemisphereZ;
+	float3 NonUniformScale;
+	bool NormalizeThickness;
+	float3 Offset;
+	bool OverrideRandomness;
+	bool OverrideSeed;
+	int RandomnessMode;
+	int RandomSeed;
+	int SpawnGroupMask;
+	float3 SphereOrigin;
+	float SphereRadius;
+	int SurfaceExpansionMode;
+	float SurfaceOnlyBandThickness;
+};
+
+struct FParamMap0_SpawnRate
+{
+	int SpawnGroup;
+	float SpawnProbability;
+	float SpawnRate;
+};
+
+struct FParamMap0_SpawnBurst_Instantaneous
+{
+	float Age;
+	int SpawnCount;
+	int SpawnGroup;
+	float SpawnProbability;
+	float SpawnTime;
+};
+
+struct FParamMap0_SolveRotationalForcesAndVelocity
+{
+	float DeltaTime;
+	float4 MeshOrientation;
+	float RotationalInertia;
+	float3 RotationalVelocity;
+	bool WritetoIntrinsicProperties;
+};
+
+struct FParamMap0_SolveForcesAndVelocity
+{
+	float AccelerationLimit;
+	float DeltaTime;
+	float3 Force;
+	float Mass;
+	float3 Position;
+	float3 PreviousVelocity;
+	float SpeedLimit;
+	float3 Velocity;
+	bool WritetoIntrinsicProperties;
+};
+
+struct FParamMap0_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd
+{
+	float SphereRadius;
+};
+
+struct FParamMap0_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd
+{
+	float SphereRadius;
+};
+
+struct FParamMap0_SetVariables_8F6BFABF4A68DD0717680888D30C109A
+{
+	FParamMap0_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd INTEGER_01_SparksInAdd;
+	FParamMap0_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd INTEGER_02_SparksOutAdd;
+};
+
+struct FParamMap0_SetVariables_1DE51F5340274BD0EEC2A088FDAFEA0B_Particles
+{
+	float3 Position;
+};
+
+struct FParamMap0_SetVariables_1DE51F5340274BD0EEC2A088FDAFEA0B
+{
+	FParamMap0_SetVariables_1DE51F5340274BD0EEC2A088FDAFEA0B_Particles Particles;
+};
+
+struct FParamMap0_ScaleSpriteSize
+{
+	float2 InitialSpriteSize;
+	float2 ScaleFactor;
+};
+
+struct FParamMap0_ScaleMeshSize
+{
+	float3 InitialMeshScale;
+	float3 ScaleFactor;
+};
+
+struct FParamMap0_ScaleColor
+{
+	float4 ColorValueToScale;
+	float ScaleAlpha;
+	float3 ScaleRGB;
+};
+
+struct FParamMap0_ParticleState
+{
+	float DeltaTime;
+	float Lifetime;
+};
+
+struct FParamMap0_Particles_Initial
+{
+	float4 Color;
+	float3 Scale;
+	float2 SpriteSize;
+};
+
+struct FParamMap0_Particles
+{
+	float Age;
+	float4 Color;
+	float4 DynamicMaterialParameter;
+	FParamMap0_Particles_Initial Initial;
+	float Lifetime;
+	float Mass;
+	float MaterialRandom;
+	float4 MeshOrientation;
+	float NormalizedAge;
+	float3 Position;
+	float3 PreviousVelocity;
+	float RotationalInertia;
+	float3 RotationalVelocity;
+	float3 Scale;
+	float SpriteRotation;
+	float2 SpriteSize;
+	int UniqueID;
+	float3 Velocity;
+};
+
+struct FParamMap0_OUTPUT_VAR_SphereLocation
+{
+	float3 SphereNormal;
+};
+
+struct FParamMap0_OUTPUT_VAR_SolveRotationalForcesAndVelocity
+{
+	float IncomingPhysicsRotationalDrag;
+	float3 IncomingPhysicsRotationalForce;
+	float4 MeshOrientation;
+	float3 RotationalVelocity;
+};
+
+struct FParamMap0_OUTPUT_VAR_SolveForcesAndVelocity
+{
+	float IncomingPhysicsDrag;
+	float3 IncomingPhysicsForce;
+	float3 Position;
+	float3 Velocity;
+};
+
+struct FParamMap0_OUTPUT_VAR_ParticleState
+{
+	bool FirstFrame;
+};
+
+struct FParamMap0_OUTPUT_VAR_AddVelocityFromPoint
+{
+	float NormalizedFalloff;
+};
+
+struct FParamMap0_OUTPUT_VAR
+{
+	FParamMap0_OUTPUT_VAR_AddVelocityFromPoint AddVelocityFromPoint;
+	FParamMap0_OUTPUT_VAR_ParticleState ParticleState;
+	FParamMap0_OUTPUT_VAR_SolveForcesAndVelocity SolveForcesAndVelocity;
+	FParamMap0_OUTPUT_VAR_SolveRotationalForcesAndVelocity SolveRotationalForcesAndVelocity;
+	FParamMap0_OUTPUT_VAR_SphereLocation SphereLocation;
+};
+
+struct FParamMap0_MeshRotationForce
+{
+	float LeverRadiusASC40cmASC41;
+	float3 Rotation;
+};
+
+struct FParamMap0_MakeVector3_FromColor
+{
+	float4 Color;
+};
+
+struct FParamMap0_Local_SphereLocation
+{
+	float3 SphereVector;
+};
+
+struct FParamMap0_Local_SpawnRate
+{
+	float InterpStartDT;
+	float IntervalDT;
+	int SpawnCount;
+	float SpawnRate;
+};
+
+struct FParamMap0_Local_SolveRotationalForcesAndVelocity
+{
+	float DeltaTime;
+	float3 ForceRotationsInRadians;
+};
+
+struct FParamMap0_Local_SolveForcesAndVelocity
+{
+	float DeltaTime;
+	float Mass;
+	float3 PhysicsForce;
+};
+
+struct FParamMap0_Local_KillParticlesInVolume
+{
+	bool IsInside;
+};
+
+struct FParamMap0_Local_EmitterState
+{
+	bool LoopCountIncreased;
+	float LoopDuration;
+	bool NoActiveEmitterParticles;
+	int PreviousEmitterState;
+};
+
+struct FParamMap0_Local
+{
+	FParamMap0_Local_EmitterState EmitterState;
+	FParamMap0_Local_KillParticlesInVolume KillParticlesInVolume;
+	FParamMap0_Local_SolveForcesAndVelocity SolveForcesAndVelocity;
+	FParamMap0_Local_SolveRotationalForcesAndVelocity SolveRotationalForcesAndVelocity;
+	FParamMap0_Local_SpawnRate SpawnRate;
+	FParamMap0_Local_SphereLocation SphereLocation;
+};
+
+struct FParamMap0_KillParticlesInVolume
+{
+	float3 BoxSize;
+	float ConeAngle;
+	float3 ConeAxis;
+	float ConeLength;
+	bool InvertVolume;
+	float3 OriginOffset;
+	float3 PlaneNormal;
+	float3 SlabAxis;
+	float SlabWidth;
+	float SphereRadius;
+	float3 VolumeOrigin;
+};
+
+struct FParamMap0_INTEGER_02_SparksOutAdd_SpawnBurst_Instantaneous
+{
+	NiagaraSpawnInfo SpawnBurst;
+};
+
+struct FParamMap0_INTEGER_02_SparksOutAdd_Scalability
+{
+	float DistanceFraction;
+};
+
+struct FParamMap0_INTEGER_02_SparksOutAdd
+{
+	float Age;
+	float CurrentLoopDelay;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	bool LocalSpace;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+	FParamMap0_INTEGER_02_SparksOutAdd_Scalability Scalability;
+	FParamMap0_INTEGER_02_SparksOutAdd_SpawnBurst_Instantaneous SpawnBurst_Instantaneous;
+	float SphereRadius;
+};
+
+struct FParamMap0_INTEGER_02_FireImpact2Add_SpawnBurst_Instantaneous
+{
+	NiagaraSpawnInfo SpawnBurst;
+};
+
+struct FParamMap0_INTEGER_02_FireImpact2Add_Scalability
+{
+	float DistanceFraction;
+};
+
+struct FParamMap0_INTEGER_02_FireImpact2Add
+{
+	float Age;
+	float CurrentLoopDelay;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	bool LocalSpace;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+	FParamMap0_INTEGER_02_FireImpact2Add_Scalability Scalability;
+	FParamMap0_INTEGER_02_FireImpact2Add_SpawnBurst_Instantaneous SpawnBurst_Instantaneous;
+};
+
+struct FParamMap0_INTEGER_02_CylinderAdd_SpawnBurst_Instantaneous
+{
+	NiagaraSpawnInfo SpawnBurst;
+};
+
+struct FParamMap0_INTEGER_02_CylinderAdd_Scalability
+{
+	float DistanceFraction;
+};
+
+struct FParamMap0_INTEGER_02_CylinderAdd
+{
+	float Age;
+	float CurrentLoopDelay;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	bool LocalSpace;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+	FParamMap0_INTEGER_02_CylinderAdd_Scalability Scalability;
+	FParamMap0_INTEGER_02_CylinderAdd_SpawnBurst_Instantaneous SpawnBurst_Instantaneous;
+};
+
+struct FParamMap0_INTEGER_02_BeamGround_SpawnBurst_Instantaneous
+{
+	NiagaraSpawnInfo SpawnBurst;
+};
+
+struct FParamMap0_INTEGER_02_BeamGround_Scalability
+{
+	float DistanceFraction;
+};
+
+struct FParamMap0_INTEGER_02_BeamGround
+{
+	float Age;
+	float CurrentLoopDelay;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	bool LocalSpace;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+	FParamMap0_INTEGER_02_BeamGround_Scalability Scalability;
+	FParamMap0_INTEGER_02_BeamGround_SpawnBurst_Instantaneous SpawnBurst_Instantaneous;
+};
+
+struct FParamMap0_INTEGER_02_BeamFlash_SpawnBurst_Instantaneous
+{
+	NiagaraSpawnInfo SpawnBurst;
+};
+
+struct FParamMap0_INTEGER_02_BeamFlash_Scalability
+{
+	float DistanceFraction;
+};
+
+struct FParamMap0_INTEGER_02_BeamFlash
+{
+	float Age;
+	float CurrentLoopDelay;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	bool LocalSpace;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+	FParamMap0_INTEGER_02_BeamFlash_Scalability Scalability;
+	FParamMap0_INTEGER_02_BeamFlash_SpawnBurst_Instantaneous SpawnBurst_Instantaneous;
+};
+
+struct FParamMap0_INTEGER_01_SparksInAdd_SpawnRate
+{
+	NiagaraSpawnInfo SpawnOutputInfo;
+	float SpawnRemainder;
+};
+
+struct FParamMap0_INTEGER_01_SparksInAdd_Scalability
+{
+	float DistanceFraction;
+};
+
+struct FParamMap0_INTEGER_01_SparksInAdd
+{
+	float Age;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	bool LocalSpace;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+	FParamMap0_INTEGER_01_SparksInAdd_Scalability Scalability;
+	FParamMap0_INTEGER_01_SparksInAdd_SpawnRate SpawnRate;
+	float SphereRadius;
+};
+
+struct FParamMap0_INTEGER_01_GroupBeamAdd_SpawnBurst_Instantaneous
+{
+	NiagaraSpawnInfo SpawnBurst;
+};
+
+struct FParamMap0_INTEGER_01_GroupBeamAdd_Scalability
+{
+	float DistanceFraction;
+};
+
+struct FParamMap0_INTEGER_01_GroupBeamAdd
+{
+	float Age;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	bool LocalSpace;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+	FParamMap0_INTEGER_01_GroupBeamAdd_Scalability Scalability;
+	FParamMap0_INTEGER_01_GroupBeamAdd_SpawnBurst_Instantaneous SpawnBurst_Instantaneous;
+};
+
+struct FParamMap0_INTEGER_01_CylinderAdd_SpawnBurst_Instantaneous
+{
+	NiagaraSpawnInfo SpawnBurst;
+};
+
+struct FParamMap0_INTEGER_01_CylinderAdd_Scalability
+{
+	float DistanceFraction;
+};
+
+struct FParamMap0_INTEGER_01_CylinderAdd
+{
+	float Age;
+	float CurrentLoopDuration;
+	int ExecutionState;
+	int ExecutionStateSource;
+	bool LocalSpace;
+	int LoopCount;
+	float LoopedAge;
+	float NormalizedLoopAge;
+	FParamMap0_INTEGER_01_CylinderAdd_Scalability Scalability;
+	FParamMap0_INTEGER_01_CylinderAdd_SpawnBurst_Instantaneous SpawnBurst_Instantaneous;
+};
+
+struct FParamMap0_InitializeParticle
+{
+	float4 Color;
+	float Lifetime;
+	float Mass;
+	float MaterialRandom;
+	float3 MeshScale;
+	float3 Position;
+	float SpriteRotation;
+	float2 SpriteSize;
+	bool WriteColor;
+	bool WriteLifetime;
+	bool WriteMass;
+	bool WriteMaterialRandom;
+	bool WritePosition;
+	bool WriteScale;
+	bool WriteSpriteRotation;
+	bool WriteSpriteSize;
+};
+
+struct FParamMap0_FloatFromCurve002
+{
+	float CurveIndex;
+	float ScaleCurve;
+};
+
+struct FParamMap0_FloatFromCurve001
+{
+	float CurveIndex;
+	float ScaleCurve;
+};
+
+struct FParamMap0_FloatFromCurve
+{
+	float CurveIndex;
+	float ScaleCurve;
+};
+
+struct FParamMap0_Engine_Owner
+{
+	float LODDistanceFraction;
+	float3 Position;
+	float4x4 SystemLocalToWorld;
+	float4x4 SystemLocalToWorldNoScale;
+	float4x4 SystemWorldToLocal;
+	float4x4 SystemWorldToLocalNoScale;
+};
+
+struct FParamMap0_Engine_INTEGER_02_SparksOutAdd
+{
+	int NumParticles;
+	float SpawnCountScale;
+};
+
+struct FParamMap0_Engine_INTEGER_02_FireImpact2Add
+{
+	int NumParticles;
+	float SpawnCountScale;
+};
+
+struct FParamMap0_Engine_INTEGER_02_CylinderAdd
+{
+	int NumParticles;
+	float SpawnCountScale;
+};
+
+struct FParamMap0_Engine_INTEGER_02_BeamGround
+{
+	int NumParticles;
+	float SpawnCountScale;
+};
+
+struct FParamMap0_Engine_INTEGER_02_BeamFlash
+{
+	int NumParticles;
+	float SpawnCountScale;
+};
+
+struct FParamMap0_Engine_INTEGER_01_SparksInAdd
+{
+	int NumParticles;
+	float SpawnCountScale;
+};
+
+struct FParamMap0_Engine_INTEGER_01_GroupBeamAdd
+{
+	int NumParticles;
+	float SpawnCountScale;
+};
+
+struct FParamMap0_Engine_INTEGER_01_CylinderAdd
+{
+	int NumParticles;
+	float SpawnCountScale;
+};
+
+struct FParamMap0_Engine_Emitter
+{
+	int TotalSpawnedParticles;
+};
+
+struct FParamMap0_Engine
+{
+	float DeltaTime;
+	FParamMap0_Engine_Emitter Emitter;
+	FParamMap0_Engine_INTEGER_01_CylinderAdd INTEGER_01_CylinderAdd;
+	FParamMap0_Engine_INTEGER_01_GroupBeamAdd INTEGER_01_GroupBeamAdd;
+	FParamMap0_Engine_INTEGER_01_SparksInAdd INTEGER_01_SparksInAdd;
+	FParamMap0_Engine_INTEGER_02_BeamFlash INTEGER_02_BeamFlash;
+	FParamMap0_Engine_INTEGER_02_BeamGround INTEGER_02_BeamGround;
+	FParamMap0_Engine_INTEGER_02_CylinderAdd INTEGER_02_CylinderAdd;
+	FParamMap0_Engine_INTEGER_02_FireImpact2Add INTEGER_02_FireImpact2Add;
+	FParamMap0_Engine_INTEGER_02_SparksOutAdd INTEGER_02_SparksOutAdd;
+	float InverseDeltaTime;
+	FParamMap0_Engine_Owner Owner;
+	float RealTime;
+	float Time;
+};
+
+struct FParamMap0_EmitterState
+{
+	float LoopDelay;
+	float LoopDuration;
+};
+
+struct FParamMap0_Emitter
+{
+	int RandomSeed;
+};
+
+struct FParamMap0_DynamicMaterialParameters
+{
+	float Index0Param1;
+	float Index0Param2;
+	float Index0Param3;
+	float Index0Param4;
+	bool Param0WriteEnabled;
+	bool Param1WriteEnabled;
+	bool Param2WriteEnabled;
+	bool Param3WriteEnabled;
+};
+
+struct FParamMap0_Divide_Float001
+{
+	float A;
+	float B;
+};
+
+struct FParamMap0_Divide_Float
+{
+	float A;
+	float B;
+};
+
+struct FParamMap0_DataInstance
+{
+	bool Alive;
+};
+
+struct FParamMap0_Constants_INTEGER_02_SparksOutAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd
+{
+	float SphereRadius;
+};
+
+struct FParamMap0_Constants_INTEGER_02_SparksOutAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A
+{
+	FParamMap0_Constants_INTEGER_02_SparksOutAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd INTEGER_02_SparksOutAdd;
+};
+
+struct FParamMap0_Constants_INTEGER_02_SparksOutAdd
+{
+	FParamMap0_Constants_INTEGER_02_SparksOutAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A SetVariables_8F6BFABF4A68DD0717680888D30C109A;
+};
+
+struct FParamMap0_Constants_INTEGER_01_SparksInAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd
+{
+	float SphereRadius;
+};
+
+struct FParamMap0_Constants_INTEGER_01_SparksInAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A
+{
+	FParamMap0_Constants_INTEGER_01_SparksInAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd INTEGER_01_SparksInAdd;
+};
+
+struct FParamMap0_Constants_INTEGER_01_SparksInAdd
+{
+	FParamMap0_Constants_INTEGER_01_SparksInAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A SetVariables_8F6BFABF4A68DD0717680888D30C109A;
+};
+
+struct FParamMap0_Constants
+{
+	FParamMap0_Constants_INTEGER_01_SparksInAdd INTEGER_01_SparksInAdd;
+	FParamMap0_Constants_INTEGER_02_SparksOutAdd INTEGER_02_SparksOutAdd;
+};
+
+struct FParamMap0_AddVelocityFromPoint
+{
+	float3 DefaultPosition;
+	bool InvertVelocityFalloff;
+	float3 OriginOffset;
+	int OriginOffsetCoordinateSpace;
+	bool UseFalloffDistance;
+	float VelocityFalloffDistance;
+	float3 VelocityOrigin;
+	float VelocityStrength;
+};
+
+struct FParamMap0
+{
+	FParamMap0_AddVelocityFromPoint AddVelocityFromPoint;
+	FParamMap0_Constants Constants;
+	FParamMap0_DataInstance DataInstance;
+	FParamMap0_Divide_Float Divide_Float;
+	FParamMap0_Divide_Float001 Divide_Float001;
+	FParamMap0_DynamicMaterialParameters DynamicMaterialParameters;
+	FParamMap0_Emitter Emitter;
+	FParamMap0_EmitterState EmitterState;
+	FParamMap0_Engine Engine;
+	FParamMap0_FloatFromCurve FloatFromCurve;
+	FParamMap0_FloatFromCurve001 FloatFromCurve001;
+	FParamMap0_FloatFromCurve002 FloatFromCurve002;
+	FParamMap0_InitializeParticle InitializeParticle;
+	FParamMap0_INTEGER_01_CylinderAdd INTEGER_01_CylinderAdd;
+	FParamMap0_INTEGER_01_GroupBeamAdd INTEGER_01_GroupBeamAdd;
+	FParamMap0_INTEGER_01_SparksInAdd INTEGER_01_SparksInAdd;
+	FParamMap0_INTEGER_02_BeamFlash INTEGER_02_BeamFlash;
+	FParamMap0_INTEGER_02_BeamGround INTEGER_02_BeamGround;
+	FParamMap0_INTEGER_02_CylinderAdd INTEGER_02_CylinderAdd;
+	FParamMap0_INTEGER_02_FireImpact2Add INTEGER_02_FireImpact2Add;
+	FParamMap0_INTEGER_02_SparksOutAdd INTEGER_02_SparksOutAdd;
+	FParamMap0_KillParticlesInVolume KillParticlesInVolume;
+	FParamMap0_Local Local;
+	FParamMap0_MakeVector3_FromColor MakeVector3_FromColor;
+	FParamMap0_MeshRotationForce MeshRotationForce;
+	FParamMap0_OUTPUT_VAR OUTPUT_VAR;
+	FParamMap0_Particles Particles;
+	FParamMap0_ParticleState ParticleState;
+	FParamMap0_ScaleColor ScaleColor;
+	FParamMap0_ScaleMeshSize ScaleMeshSize;
+	FParamMap0_ScaleSpriteSize ScaleSpriteSize;
+	FParamMap0_SetVariables_1DE51F5340274BD0EEC2A088FDAFEA0B SetVariables_1DE51F5340274BD0EEC2A088FDAFEA0B;
+	FParamMap0_SetVariables_8F6BFABF4A68DD0717680888D30C109A SetVariables_8F6BFABF4A68DD0717680888D30C109A;
+	FParamMap0_SolveForcesAndVelocity SolveForcesAndVelocity;
+	FParamMap0_SolveRotationalForcesAndVelocity SolveRotationalForcesAndVelocity;
+	FParamMap0_SpawnBurst_Instantaneous SpawnBurst_Instantaneous;
+	FParamMap0_SpawnRate SpawnRate;
+	FParamMap0_SphereLocation SphereLocation;
+	FParamMap0_System System;
+	FParamMap0_TransformPosition TransformPosition;
+	FParamMap0_Transient Transient;
+	FParamMap0_UniformRangedFloat UniformRangedFloat;
+	FParamMap0_UniformRangedFloat001 UniformRangedFloat001;
+	FParamMap0_UniformRangedInt UniformRangedInt;
+	FParamMap0_UniformRangedLinearColor UniformRangedLinearColor;
+	FParamMap0_UniformRangedVector2D UniformRangedVector2D;
+	FParamMap0_User User;
+	FParamMap0_Vector2DFromFloat Vector2DFromFloat;
+	FParamMap0_Vector2DFromFloat001 Vector2DFromFloat001;
+	FParamMap0_VectorFromCurve VectorFromCurve;
+	FParamMap0_VectorFromCurve001 VectorFromCurve001;
+	FParamMap0_VectorFromFloat VectorFromFloat;
+};
+
+struct FSimulationContext
+{
+	FParamMap0 Map;
+};
+
+static float HackSpawnInterp = 1.0;
+void INTEGER_02_FireImpact2Add_Func_(inout FSimulationContext Context);
+void INTEGER_02_BeamFlash_Func_(inout FSimulationContext Context);
+void INTEGER_02_BeamGround_Func_(inout FSimulationContext Context);
+void SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd_Func_(inout FSimulationContext Context);
+void INTEGER_02_SparksOutAdd_Func_(inout FSimulationContext Context);
+void INTEGER_02_CylinderAdd_Func_(inout FSimulationContext Context);
+void SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd_Func_(inout FSimulationContext Context);
+void INTEGER_01_SparksInAdd_Func_(inout FSimulationContext Context);
+void INTEGER_01_GroupBeamAdd_Func_(inout FSimulationContext Context);
+void INTEGER_01_CylinderAdd_Func_(inout FSimulationContext Context);
+float GetSpawnInterpolation();
+void INTEGER_02_FireImpact2Add_Func_(inout FSimulationContext Context)
+{
+
+}
+
+void INTEGER_02_BeamFlash_Func_(inout FSimulationContext Context)
+{
+
+}
+
+void INTEGER_02_BeamGround_Func_(inout FSimulationContext Context)
+{
+
+}
+
+void SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd_Func_(inout FSimulationContext Context)
+{
+	Context.Map.INTEGER_02_SparksOutAdd.SphereRadius = Context.Map.Constants.INTEGER_02_SparksOutAdd.SetVariables_8F6BFABF4A68DD0717680888D30C109A.INTEGER_02_SparksOutAdd.SphereRadius;
+}
+
+void INTEGER_02_SparksOutAdd_Func_(inout FSimulationContext Context)
+{
+	EnterStatScope(5 );
+	SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd_Func_(Context);
+	ExitStatScope( );
+}
+
+void INTEGER_02_CylinderAdd_Func_(inout FSimulationContext Context)
+{
+
+}
+
+void SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd_Func_(inout FSimulationContext Context)
+{
+	Context.Map.INTEGER_01_SparksInAdd.SphereRadius = Context.Map.Constants.INTEGER_01_SparksInAdd.SetVariables_8F6BFABF4A68DD0717680888D30C109A.INTEGER_01_SparksInAdd.SphereRadius;
+}
+
+void INTEGER_01_SparksInAdd_Func_(inout FSimulationContext Context)
+{
+	EnterStatScope(8 );
+	SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd_Func_(Context);
+	ExitStatScope( );
+}
+
+void INTEGER_01_GroupBeamAdd_Func_(inout FSimulationContext Context)
+{
+
+}
+
+void INTEGER_01_CylinderAdd_Func_(inout FSimulationContext Context)
+{
+
+}
+
+float GetSpawnInterpolation()
+{
+	return 1.0f;}
+
+
+void ReadDataSets(inout FSimulationContext Context)
+{
+}
+
+void WriteDataSets(inout FSimulationContext Context)
+{
+}
+
+void Simulate(inout FSimulationContext Context)
+{
+	EnterStatScope(0 );
+
+	int Constant = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.ExecutionState = Constant;
+	float Constant1 = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.Age = Constant1;
+	float Constant2 = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.LoopedAge = Constant2;
+	float Constant3 = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.CurrentLoopDuration = Constant3;
+	float Constant4 = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.CurrentLoopDelay = Constant4;
+	int Constant5 = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.LoopCount = Constant5;
+	float Constant6 = (0.0);
+	Context.Map.INTEGER_02_FireImpact2Add.NormalizedLoopAge = Constant6;
+	float Constant7 = (0.0);
+	Context.Map.INTEGER_02_FireImpact2Add.Scalability.DistanceFraction = Constant7;
+	int Constant8 = 0;
+	Context.Map.System.ExecutionState = Constant8;
+	int Constant9 = 0;
+	Context.Map.System.ExecutionStateSource = Constant9;
+	int Constant10 = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.ExecutionStateSource = Constant10;
+	NiagaraSpawnInfo Constant11 = (NiagaraSpawnInfo)0;
+	Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst = Constant11;
+	bool Constant12 = false;
+	Context.Map.INTEGER_02_FireImpact2Add.LocalSpace = Constant12;
+	int Constant13 = 0;
+	Context.Map.INTEGER_02_BeamFlash.ExecutionState = Constant13;
+	float Constant14 = 0;
+	Context.Map.INTEGER_02_BeamFlash.Age = Constant14;
+	float Constant15 = 0;
+	Context.Map.INTEGER_02_BeamFlash.LoopedAge = Constant15;
+	float Constant16 = 0;
+	Context.Map.INTEGER_02_BeamFlash.CurrentLoopDuration = Constant16;
+	float Constant17 = 0;
+	Context.Map.INTEGER_02_BeamFlash.CurrentLoopDelay = Constant17;
+	int Constant18 = 0;
+	Context.Map.INTEGER_02_BeamFlash.LoopCount = Constant18;
+	float Constant19 = (0.0);
+	Context.Map.INTEGER_02_BeamFlash.NormalizedLoopAge = Constant19;
+	float Constant20 = (0.0);
+	Context.Map.INTEGER_02_BeamFlash.Scalability.DistanceFraction = Constant20;
+	int Constant21 = 0;
+	Context.Map.INTEGER_02_BeamFlash.ExecutionStateSource = Constant21;
+	NiagaraSpawnInfo Constant22 = (NiagaraSpawnInfo)0;
+	Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst = Constant22;
+	bool Constant23 = false;
+	Context.Map.INTEGER_02_BeamFlash.LocalSpace = Constant23;
+	int Constant24 = 0;
+	Context.Map.INTEGER_02_BeamGround.ExecutionState = Constant24;
+	float Constant25 = 0;
+	Context.Map.INTEGER_02_BeamGround.Age = Constant25;
+	float Constant26 = 0;
+	Context.Map.INTEGER_02_BeamGround.LoopedAge = Constant26;
+	float Constant27 = 0;
+	Context.Map.INTEGER_02_BeamGround.CurrentLoopDuration = Constant27;
+	float Constant28 = 0;
+	Context.Map.INTEGER_02_BeamGround.CurrentLoopDelay = Constant28;
+	int Constant29 = 0;
+	Context.Map.INTEGER_02_BeamGround.LoopCount = Constant29;
+	float Constant30 = (0.0);
+	Context.Map.INTEGER_02_BeamGround.NormalizedLoopAge = Constant30;
+	float Constant31 = (0.0);
+	Context.Map.INTEGER_02_BeamGround.Scalability.DistanceFraction = Constant31;
+	int Constant32 = 0;
+	Context.Map.INTEGER_02_BeamGround.ExecutionStateSource = Constant32;
+	NiagaraSpawnInfo Constant33 = (NiagaraSpawnInfo)0;
+	Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst = Constant33;
+	bool Constant34 = false;
+	Context.Map.INTEGER_02_BeamGround.LocalSpace = Constant34;
+	float Constant35 = (0.0);
+	Context.Map.INTEGER_02_SparksOutAdd.SphereRadius = Constant35;
+	int Constant36 = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.ExecutionState = Constant36;
+	float Constant37 = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.Age = Constant37;
+	float Constant38 = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.LoopedAge = Constant38;
+	float Constant39 = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.CurrentLoopDuration = Constant39;
+	float Constant40 = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.CurrentLoopDelay = Constant40;
+	int Constant41 = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.LoopCount = Constant41;
+	float Constant42 = (0.0);
+	Context.Map.INTEGER_02_SparksOutAdd.NormalizedLoopAge = Constant42;
+	float Constant43 = (0.0);
+	Context.Map.INTEGER_02_SparksOutAdd.Scalability.DistanceFraction = Constant43;
+	int Constant44 = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.ExecutionStateSource = Constant44;
+	NiagaraSpawnInfo Constant45 = (NiagaraSpawnInfo)0;
+	Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst = Constant45;
+	bool Constant46 = false;
+	Context.Map.INTEGER_02_SparksOutAdd.LocalSpace = Constant46;
+	int Constant47 = 0;
+	Context.Map.INTEGER_02_CylinderAdd.ExecutionState = Constant47;
+	float Constant48 = 0;
+	Context.Map.INTEGER_02_CylinderAdd.Age = Constant48;
+	float Constant49 = 0;
+	Context.Map.INTEGER_02_CylinderAdd.LoopedAge = Constant49;
+	float Constant50 = 0;
+	Context.Map.INTEGER_02_CylinderAdd.CurrentLoopDuration = Constant50;
+	float Constant51 = 0;
+	Context.Map.INTEGER_02_CylinderAdd.CurrentLoopDelay = Constant51;
+	int Constant52 = 0;
+	Context.Map.INTEGER_02_CylinderAdd.LoopCount = Constant52;
+	float Constant53 = (0.0);
+	Context.Map.INTEGER_02_CylinderAdd.NormalizedLoopAge = Constant53;
+	float Constant54 = (0.0);
+	Context.Map.INTEGER_02_CylinderAdd.Scalability.DistanceFraction = Constant54;
+	int Constant55 = 0;
+	Context.Map.INTEGER_02_CylinderAdd.ExecutionStateSource = Constant55;
+	NiagaraSpawnInfo Constant56 = (NiagaraSpawnInfo)0;
+	Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst = Constant56;
+	bool Constant57 = false;
+	Context.Map.INTEGER_02_CylinderAdd.LocalSpace = Constant57;
+	float Constant58 = (0.0);
+	Context.Map.INTEGER_01_SparksInAdd.SphereRadius = Constant58;
+	int Constant59 = 0;
+	Context.Map.INTEGER_01_SparksInAdd.ExecutionState = Constant59;
+	float Constant60 = 0;
+	Context.Map.INTEGER_01_SparksInAdd.Age = Constant60;
+	float Constant61 = 0;
+	Context.Map.INTEGER_01_SparksInAdd.CurrentLoopDuration = Constant61;
+	float Constant62 = 0;
+	Context.Map.INTEGER_01_SparksInAdd.LoopedAge = Constant62;
+	int Constant63 = 0;
+	Context.Map.INTEGER_01_SparksInAdd.LoopCount = Constant63;
+	float Constant64 = (0.0);
+	Context.Map.INTEGER_01_SparksInAdd.NormalizedLoopAge = Constant64;
+	float Constant65 = (0.0);
+	Context.Map.INTEGER_01_SparksInAdd.Scalability.DistanceFraction = Constant65;
+	int Constant66 = 0;
+	Context.Map.INTEGER_01_SparksInAdd.ExecutionStateSource = Constant66;
+	float Constant67 = 0;
+	Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnRemainder = Constant67;
+	NiagaraSpawnInfo Constant68 = (NiagaraSpawnInfo)0;
+	Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo = Constant68;
+	bool Constant69 = false;
+	Context.Map.INTEGER_01_SparksInAdd.LocalSpace = Constant69;
+	int Constant70 = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.ExecutionState = Constant70;
+	float Constant71 = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.Age = Constant71;
+	float Constant72 = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.CurrentLoopDuration = Constant72;
+	float Constant73 = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.LoopedAge = Constant73;
+	int Constant74 = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.LoopCount = Constant74;
+	float Constant75 = (0.0);
+	Context.Map.INTEGER_01_GroupBeamAdd.NormalizedLoopAge = Constant75;
+	float Constant76 = (0.0);
+	Context.Map.INTEGER_01_GroupBeamAdd.Scalability.DistanceFraction = Constant76;
+	int Constant77 = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.ExecutionStateSource = Constant77;
+	NiagaraSpawnInfo Constant78 = (NiagaraSpawnInfo)0;
+	Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst = Constant78;
+	bool Constant79 = false;
+	Context.Map.INTEGER_01_GroupBeamAdd.LocalSpace = Constant79;
+	int Constant80 = 0;
+	Context.Map.INTEGER_01_CylinderAdd.ExecutionState = Constant80;
+	float Constant81 = 0;
+	Context.Map.INTEGER_01_CylinderAdd.Age = Constant81;
+	float Constant82 = 0;
+	Context.Map.INTEGER_01_CylinderAdd.CurrentLoopDuration = Constant82;
+	float Constant83 = 0;
+	Context.Map.INTEGER_01_CylinderAdd.LoopedAge = Constant83;
+	int Constant84 = 0;
+	Context.Map.INTEGER_01_CylinderAdd.LoopCount = Constant84;
+	float Constant85 = (0.0);
+	Context.Map.INTEGER_01_CylinderAdd.NormalizedLoopAge = Constant85;
+	float Constant86 = (0.0);
+	Context.Map.INTEGER_01_CylinderAdd.Scalability.DistanceFraction = Constant86;
+	int Constant87 = 0;
+	Context.Map.INTEGER_01_CylinderAdd.ExecutionStateSource = Constant87;
+	NiagaraSpawnInfo Constant88 = (NiagaraSpawnInfo)0;
+	Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst = Constant88;
+	bool Constant89 = false;
+	Context.Map.INTEGER_01_CylinderAdd.LocalSpace = Constant89;
+	float Constant90 = 0;
+	Context.Map.System.Age = Constant90;
+	float Constant91 = 0;
+	Context.Map.System.CurrentLoopDuration = Constant91;
+	float Constant92 = 0;
+	Context.Map.System.LoopedAge = Constant92;
+	int Constant93 = 0;
+	Context.Map.System.LoopCount = Constant93;
+	float Constant94 = (0.0);
+	Context.Map.System.NormalizedLoopAge = Constant94;
+	bool Constant95 = false;
+	Context.Map.System.bCompleteOnInactive = Constant95;
+
+	EnterStatScope(1 );
+	INTEGER_02_FireImpact2Add_Func_(Context);
+	ExitStatScope( );
+	EnterStatScope(2 );
+	INTEGER_02_BeamFlash_Func_(Context);
+	ExitStatScope( );
+	EnterStatScope(3 );
+	INTEGER_02_BeamGround_Func_(Context);
+	ExitStatScope( );
+	EnterStatScope(4 );
+	INTEGER_02_SparksOutAdd_Func_(Context);
+	ExitStatScope( );
+	EnterStatScope(6 );
+	INTEGER_02_CylinderAdd_Func_(Context);
+	ExitStatScope( );
+	EnterStatScope(7 );
+	INTEGER_01_SparksInAdd_Func_(Context);
+	ExitStatScope( );
+	EnterStatScope(9 );
+	INTEGER_01_GroupBeamAdd_Func_(Context);
+	ExitStatScope( );
+	EnterStatScope(10 );
+	INTEGER_01_CylinderAdd_Func_(Context);
+	ExitStatScope( );
+
+
+
+
+	ExitStatScope( );
+}
+void SimulateMain()
+{
+EnterStatScope(11 );
+
+	FSimulationContext Context = (FSimulationContext)0;
+	Context.Map.INTEGER_01_CylinderAdd.Age = 0.0f;
+	Context.Map.INTEGER_01_CylinderAdd.CurrentLoopDuration = 0.0f;
+	Context.Map.INTEGER_01_CylinderAdd.ExecutionState = 0;
+	Context.Map.INTEGER_01_CylinderAdd.ExecutionStateSource = 0;
+	Context.Map.INTEGER_01_CylinderAdd.LocalSpace = false;
+	Context.Map.INTEGER_01_CylinderAdd.LoopCount = 0;
+	Context.Map.INTEGER_01_CylinderAdd.LoopedAge = 0.0f;
+	Context.Map.INTEGER_01_CylinderAdd.NormalizedLoopAge = 0.0f;
+	Context.Map.INTEGER_01_CylinderAdd.Scalability.DistanceFraction = 0.0f;
+	Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.Count = 0;
+	Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt = 0.0f;
+	Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt = 0.0f;
+	Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.Age = 0.0f;
+	Context.Map.INTEGER_01_GroupBeamAdd.CurrentLoopDuration = 0.0f;
+	Context.Map.INTEGER_01_GroupBeamAdd.ExecutionState = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.ExecutionStateSource = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.LocalSpace = false;
+	Context.Map.INTEGER_01_GroupBeamAdd.LoopCount = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.LoopedAge = 0.0f;
+	Context.Map.INTEGER_01_GroupBeamAdd.NormalizedLoopAge = 0.0f;
+	Context.Map.INTEGER_01_GroupBeamAdd.Scalability.DistanceFraction = 0.0f;
+	Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst.Count = 0;
+	Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt = 0.0f;
+	Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt = 0.0f;
+	Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup = 0;
+	Context.Map.INTEGER_01_SparksInAdd.Age = 0.0f;
+	Context.Map.INTEGER_01_SparksInAdd.CurrentLoopDuration = 0.0f;
+	Context.Map.INTEGER_01_SparksInAdd.ExecutionState = 0;
+	Context.Map.INTEGER_01_SparksInAdd.ExecutionStateSource = 0;
+	Context.Map.INTEGER_01_SparksInAdd.LocalSpace = false;
+	Context.Map.INTEGER_01_SparksInAdd.LoopCount = 0;
+	Context.Map.INTEGER_01_SparksInAdd.LoopedAge = 0.0f;
+	Context.Map.INTEGER_01_SparksInAdd.NormalizedLoopAge = 0.0f;
+	Context.Map.INTEGER_01_SparksInAdd.Scalability.DistanceFraction = 0.0f;
+	Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo.Count = 0;
+	Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo.InterpStartDt = 0.0f;
+	Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo.IntervalDt = 0.0f;
+	Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo.SpawnGroup = 0;
+	Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnRemainder = 0.0f;
+	Context.Map.INTEGER_01_SparksInAdd.SphereRadius = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.Age = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.CurrentLoopDelay = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.CurrentLoopDuration = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.ExecutionState = 0;
+	Context.Map.INTEGER_02_BeamFlash.ExecutionStateSource = 0;
+	Context.Map.INTEGER_02_BeamFlash.LocalSpace = false;
+	Context.Map.INTEGER_02_BeamFlash.LoopCount = 0;
+	Context.Map.INTEGER_02_BeamFlash.LoopedAge = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.NormalizedLoopAge = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.Scalability.DistanceFraction = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst.Count = 0;
+	Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt = 0.0f;
+	Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup = 0;
+	Context.Map.INTEGER_02_BeamGround.Age = 0.0f;
+	Context.Map.INTEGER_02_BeamGround.CurrentLoopDelay = 0.0f;
+	Context.Map.INTEGER_02_BeamGround.CurrentLoopDuration = 0.0f;
+	Context.Map.INTEGER_02_BeamGround.ExecutionState = 0;
+	Context.Map.INTEGER_02_BeamGround.ExecutionStateSource = 0;
+	Context.Map.INTEGER_02_BeamGround.LocalSpace = false;
+	Context.Map.INTEGER_02_BeamGround.LoopCount = 0;
+	Context.Map.INTEGER_02_BeamGround.LoopedAge = 0.0f;
+	Context.Map.INTEGER_02_BeamGround.NormalizedLoopAge = 0.0f;
+	Context.Map.INTEGER_02_BeamGround.Scalability.DistanceFraction = 0.0f;
+	Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst.Count = 0;
+	Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt = 0.0f;
+	Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt = 0.0f;
+	Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup = 0;
+	Context.Map.INTEGER_02_CylinderAdd.Age = 0.0f;
+	Context.Map.INTEGER_02_CylinderAdd.CurrentLoopDelay = 0.0f;
+	Context.Map.INTEGER_02_CylinderAdd.CurrentLoopDuration = 0.0f;
+	Context.Map.INTEGER_02_CylinderAdd.ExecutionState = 0;
+	Context.Map.INTEGER_02_CylinderAdd.ExecutionStateSource = 0;
+	Context.Map.INTEGER_02_CylinderAdd.LocalSpace = false;
+	Context.Map.INTEGER_02_CylinderAdd.LoopCount = 0;
+	Context.Map.INTEGER_02_CylinderAdd.LoopedAge = 0.0f;
+	Context.Map.INTEGER_02_CylinderAdd.NormalizedLoopAge = 0.0f;
+	Context.Map.INTEGER_02_CylinderAdd.Scalability.DistanceFraction = 0.0f;
+	Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.Count = 0;
+	Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt = 0.0f;
+	Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt = 0.0f;
+	Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.Age = 0.0f;
+	Context.Map.INTEGER_02_FireImpact2Add.CurrentLoopDelay = 0.0f;
+	Context.Map.INTEGER_02_FireImpact2Add.CurrentLoopDuration = 0.0f;
+	Context.Map.INTEGER_02_FireImpact2Add.ExecutionState = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.ExecutionStateSource = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.LocalSpace = false;
+	Context.Map.INTEGER_02_FireImpact2Add.LoopCount = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.LoopedAge = 0.0f;
+	Context.Map.INTEGER_02_FireImpact2Add.NormalizedLoopAge = 0.0f;
+	Context.Map.INTEGER_02_FireImpact2Add.Scalability.DistanceFraction = 0.0f;
+	Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst.Count = 0;
+	Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt = 0.0f;
+	Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt = 0.0f;
+	Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.Age = 0.0f;
+	Context.Map.INTEGER_02_SparksOutAdd.CurrentLoopDelay = 0.0f;
+	Context.Map.INTEGER_02_SparksOutAdd.CurrentLoopDuration = 0.0f;
+	Context.Map.INTEGER_02_SparksOutAdd.ExecutionState = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.ExecutionStateSource = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.LocalSpace = false;
+	Context.Map.INTEGER_02_SparksOutAdd.LoopCount = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.LoopedAge = 0.0f;
+	Context.Map.INTEGER_02_SparksOutAdd.NormalizedLoopAge = 0.0f;
+	Context.Map.INTEGER_02_SparksOutAdd.Scalability.DistanceFraction = 0.0f;
+	Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst.Count = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt = 0.0f;
+	Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt = 0.0f;
+	Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup = 0;
+	Context.Map.INTEGER_02_SparksOutAdd.SphereRadius = 0.0f;
+	Context.Map.Emitter.RandomSeed = 0;
+	Context.Map.System.Age = 0.0f;
+	Context.Map.System.bCompleteOnInactive = false;
+	Context.Map.System.CurrentLoopDuration = 0.0f;
+	Context.Map.System.ExecutionState = 0;
+	Context.Map.System.ExecutionStateSource = 0;
+	Context.Map.System.LoopCount = 0;
+	Context.Map.System.LoopedAge = 0.0f;
+	Context.Map.System.NormalizedLoopAge = 0.0f;
+	Context.Map.Engine.Emitter.TotalSpawnedParticles = InputDataInt(1, 0);
+	Context.Map.Constants.INTEGER_02_SparksOutAdd.SetVariables_8F6BFABF4A68DD0717680888D30C109A.INTEGER_02_SparksOutAdd.SphereRadius = Constants_INTEGER_02_SparksOutAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_02_SparksOutAdd_SphereRadius;
+	Context.Map.Constants.INTEGER_01_SparksInAdd.SetVariables_8F6BFABF4A68DD0717680888D30C109A.INTEGER_01_SparksInAdd.SphereRadius = Constants_INTEGER_01_SparksInAdd_SetVariables_8F6BFABF4A68DD0717680888D30C109A_INTEGER_01_SparksInAdd_SphereRadius;
+	Context.Map.Emitter.RandomSeed = Emitter_RandomSeed;
+	ReadDataSets(Context);
+	Simulate(Context);
+	WriteDataSets(Context);
+	{
+	int TmpWriteIndex = OutputIndex(0, false, true);
+	OutputDataFloat(0, 0, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.Age);
+	OutputDataFloat(0, 1, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.CurrentLoopDuration);
+	OutputDataInt(0, 2, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.ExecutionState);
+	OutputDataInt(0, 3, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.ExecutionStateSource);
+	OutputDataBool(0, 4, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.LocalSpace);
+	OutputDataInt(0, 5, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.LoopCount);
+	OutputDataFloat(0, 6, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.LoopedAge);
+	OutputDataFloat(0, 7, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.NormalizedLoopAge);
+	OutputDataFloat(0, 8, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.Scalability.DistanceFraction);
+	OutputDataInt(0, 9, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.Count);
+	OutputDataFloat(0, 10, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt);
+	OutputDataFloat(0, 11, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt);
+	OutputDataInt(0, 12, TmpWriteIndex, Context.Map.INTEGER_01_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup);
+	OutputDataFloat(0, 13, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.Age);
+	OutputDataFloat(0, 14, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.CurrentLoopDuration);
+	OutputDataInt(0, 15, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.ExecutionState);
+	OutputDataInt(0, 16, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.ExecutionStateSource);
+	OutputDataBool(0, 17, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.LocalSpace);
+	OutputDataInt(0, 18, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.LoopCount);
+	OutputDataFloat(0, 19, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.LoopedAge);
+	OutputDataFloat(0, 20, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.NormalizedLoopAge);
+	OutputDataFloat(0, 21, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.Scalability.DistanceFraction);
+	OutputDataInt(0, 22, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst.Count);
+	OutputDataFloat(0, 23, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt);
+	OutputDataFloat(0, 24, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt);
+	OutputDataInt(0, 25, TmpWriteIndex, Context.Map.INTEGER_01_GroupBeamAdd.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup);
+	OutputDataFloat(0, 26, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.Age);
+	OutputDataFloat(0, 27, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.CurrentLoopDuration);
+	OutputDataInt(0, 28, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.ExecutionState);
+	OutputDataInt(0, 29, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.ExecutionStateSource);
+	OutputDataBool(0, 30, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.LocalSpace);
+	OutputDataInt(0, 31, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.LoopCount);
+	OutputDataFloat(0, 32, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.LoopedAge);
+	OutputDataFloat(0, 33, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.NormalizedLoopAge);
+	OutputDataFloat(0, 34, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.Scalability.DistanceFraction);
+	OutputDataInt(0, 35, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo.Count);
+	OutputDataFloat(0, 36, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo.InterpStartDt);
+	OutputDataFloat(0, 37, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo.IntervalDt);
+	OutputDataInt(0, 38, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnOutputInfo.SpawnGroup);
+	OutputDataFloat(0, 39, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.SpawnRate.SpawnRemainder);
+	OutputDataFloat(0, 40, TmpWriteIndex, Context.Map.INTEGER_01_SparksInAdd.SphereRadius);
+	OutputDataFloat(0, 41, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.Age);
+	OutputDataFloat(0, 42, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.CurrentLoopDelay);
+	OutputDataFloat(0, 43, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.CurrentLoopDuration);
+	OutputDataInt(0, 44, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.ExecutionState);
+	OutputDataInt(0, 45, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.ExecutionStateSource);
+	OutputDataBool(0, 46, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.LocalSpace);
+	OutputDataInt(0, 47, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.LoopCount);
+	OutputDataFloat(0, 48, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.LoopedAge);
+	OutputDataFloat(0, 49, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.NormalizedLoopAge);
+	OutputDataFloat(0, 50, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.Scalability.DistanceFraction);
+	OutputDataInt(0, 51, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst.Count);
+	OutputDataFloat(0, 52, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt);
+	OutputDataFloat(0, 53, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt);
+	OutputDataInt(0, 54, TmpWriteIndex, Context.Map.INTEGER_02_BeamFlash.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup);
+	OutputDataFloat(0, 55, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.Age);
+	OutputDataFloat(0, 56, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.CurrentLoopDelay);
+	OutputDataFloat(0, 57, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.CurrentLoopDuration);
+	OutputDataInt(0, 58, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.ExecutionState);
+	OutputDataInt(0, 59, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.ExecutionStateSource);
+	OutputDataBool(0, 60, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.LocalSpace);
+	OutputDataInt(0, 61, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.LoopCount);
+	OutputDataFloat(0, 62, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.LoopedAge);
+	OutputDataFloat(0, 63, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.NormalizedLoopAge);
+	OutputDataFloat(0, 64, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.Scalability.DistanceFraction);
+	OutputDataInt(0, 65, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst.Count);
+	OutputDataFloat(0, 66, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt);
+	OutputDataFloat(0, 67, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt);
+	OutputDataInt(0, 68, TmpWriteIndex, Context.Map.INTEGER_02_BeamGround.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup);
+	OutputDataFloat(0, 69, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.Age);
+	OutputDataFloat(0, 70, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.CurrentLoopDelay);
+	OutputDataFloat(0, 71, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.CurrentLoopDuration);
+	OutputDataInt(0, 72, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.ExecutionState);
+	OutputDataInt(0, 73, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.ExecutionStateSource);
+	OutputDataBool(0, 74, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.LocalSpace);
+	OutputDataInt(0, 75, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.LoopCount);
+	OutputDataFloat(0, 76, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.LoopedAge);
+	OutputDataFloat(0, 77, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.NormalizedLoopAge);
+	OutputDataFloat(0, 78, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.Scalability.DistanceFraction);
+	OutputDataInt(0, 79, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.Count);
+	OutputDataFloat(0, 80, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt);
+	OutputDataFloat(0, 81, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt);
+	OutputDataInt(0, 82, TmpWriteIndex, Context.Map.INTEGER_02_CylinderAdd.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup);
+	OutputDataFloat(0, 83, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.Age);
+	OutputDataFloat(0, 84, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.CurrentLoopDelay);
+	OutputDataFloat(0, 85, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.CurrentLoopDuration);
+	OutputDataInt(0, 86, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.ExecutionState);
+	OutputDataInt(0, 87, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.ExecutionStateSource);
+	OutputDataBool(0, 88, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.LocalSpace);
+	OutputDataInt(0, 89, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.LoopCount);
+	OutputDataFloat(0, 90, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.LoopedAge);
+	OutputDataFloat(0, 91, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.NormalizedLoopAge);
+	OutputDataFloat(0, 92, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.Scalability.DistanceFraction);
+	OutputDataInt(0, 93, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst.Count);
+	OutputDataFloat(0, 94, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt);
+	OutputDataFloat(0, 95, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt);
+	OutputDataInt(0, 96, TmpWriteIndex, Context.Map.INTEGER_02_FireImpact2Add.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup);
+	OutputDataFloat(0, 97, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.Age);
+	OutputDataFloat(0, 98, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.CurrentLoopDelay);
+	OutputDataFloat(0, 99, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.CurrentLoopDuration);
+	OutputDataInt(0, 100, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.ExecutionState);
+	OutputDataInt(0, 101, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.ExecutionStateSource);
+	OutputDataBool(0, 102, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.LocalSpace);
+	OutputDataInt(0, 103, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.LoopCount);
+	OutputDataFloat(0, 104, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.LoopedAge);
+	OutputDataFloat(0, 105, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.NormalizedLoopAge);
+	OutputDataFloat(0, 106, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.Scalability.DistanceFraction);
+	OutputDataInt(0, 107, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst.Count);
+	OutputDataFloat(0, 108, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst.InterpStartDt);
+	OutputDataFloat(0, 109, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst.IntervalDt);
+	OutputDataInt(0, 110, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.SpawnBurst_Instantaneous.SpawnBurst.SpawnGroup);
+	OutputDataFloat(0, 111, TmpWriteIndex, Context.Map.INTEGER_02_SparksOutAdd.SphereRadius);
+	OutputDataInt(0, 112, TmpWriteIndex, Context.Map.Emitter.RandomSeed);
+	OutputDataFloat(0, 113, TmpWriteIndex, Context.Map.System.Age);
+	OutputDataBool(0, 114, TmpWriteIndex, Context.Map.System.bCompleteOnInactive);
+	OutputDataFloat(0, 115, TmpWriteIndex, Context.Map.System.CurrentLoopDuration);
+	OutputDataInt(0, 116, TmpWriteIndex, Context.Map.System.ExecutionState);
+	OutputDataInt(0, 117, TmpWriteIndex, Context.Map.System.ExecutionStateSource);
+	OutputDataInt(0, 118, TmpWriteIndex, Context.Map.System.LoopCount);
+	OutputDataFloat(0, 119, TmpWriteIndex, Context.Map.System.LoopedAge);
+	OutputDataFloat(0, 120, TmpWriteIndex, Context.Map.System.NormalizedLoopAge);
+	}
+ExitStatScope( );
+}
+#line 703 "/Plugin/FX/Niagara/Private/NiagaraEmitterInstanceShader.usf"
+
+#if 0 /*BEGIN_RESOURCE_TABLES*/
+NULL, 0
+NULL, NULL, 0, 0
+#endif /*END_RESOURCE_TABLES*/
